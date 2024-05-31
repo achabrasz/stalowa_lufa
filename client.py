@@ -5,7 +5,7 @@ import time
 import socket
 import struct
 
-MAX_PLAYERS = 4
+MAX_PLAYERS = 3
 MAX_BULLETS = 5
 
 class Point:
@@ -32,17 +32,19 @@ class Bullet:
         pygame.draw.circle(screen, (43, 43, 43), (int(self.position.x), int(self.position.y)), self.radius)
 
 
-def recv_tanks(sock):
-    tanks_data = sock.recv(MAX_PLAYERS * struct.calcsize('ff i 10h c h'))
+def recv_tanks(client_sock):
+    tanks_data = client_sock.recv(MAX_PLAYERS * struct.calcsize('2f i c h 2f h i 2f h i 2f h i'))
     tanks = []
     for i in range(MAX_PLAYERS):
-        offset = i * struct.calcsize('ff i 10h c h')
-        data = tanks_data[offset:offset + struct.calcsize('ff i 10h c h')]
-        position_x, position_y, turnover_deg, *bullets, colour, is_alive = struct.unpack('ff i 10h c h', data)
-        position = Point(position_x, position_y)
-        bullet_positions = [Point(bullets[i*2], bullets[i*2+1]) for i in range(MAX_BULLETS)]
-        tank = Tank(position, turnover_deg, bullet_positions, colour.decode('utf-8'), is_alive)
-        tanks.append(tank)
+        offset = i * struct.calcsize('2f i c h 2f h i 2f h i 2f h i')
+        data = tanks_data[offset:offset + struct.calcsize('2f i c h 2f h i 2f h i 2f h i')]
+        position_x, position_y, turnover_deg, colour, is_alive, *bullets = struct.unpack('2f i c h 2f h i 2f h i 2f h i', data)
+        if is_alive == 1:
+            position = Point(position_x, position_y)
+            bullet_positions = [Point(0,0) for i in range(MAX_BULLETS)]
+            #bullet_positions = [Point(bullets[i*2], bullets[i*2+1]) for i in range(MAX_BULLETS)]
+            tank = Tank(position, turnover_deg, bullet_positions, colour.decode('utf-8'), is_alive)
+            tanks.append(tank)
     return tanks
 
 
@@ -125,8 +127,7 @@ def main():
                         start = True
                         start_time = time.time()
                         try:
-                            client_socket.send(color.encode('utf-8'))
-                            data = client_socket.recv(8)
+                            client_socket.send(picked_colour.encode('utf-8'))
                         except socket.error as e:
                             print(e)
 
@@ -168,12 +169,13 @@ def main():
                         tank_image = tankPinkImage
                     elif tank.colour == 'y':
                         tank_image = tankYellowImage
+                    print(tank.position)
                     rotated_image = pygame.transform.rotate(tank_image, tank.turnover_deg + 270)
-                    rotated_rect = rotated_image.get_rect(center=tank.position)
+                    rotated_rect = rotated_image.get_rect(center=(tank.position.x,tank.position.y))
                     screen.blit(rotated_image, rotated_rect.topleft)
-                    for bullet in tank.bullets:
-                        if bullet.is_alive:
-                            bullet.draw(screen)
+                   # for bullet in tank.bullets:
+                    #    if bullet.is_alive:
+                     #       bullet.draw(screen)
 
             keys = pygame.key.get_pressed()
             if keys[pygame.K_LEFT]:
